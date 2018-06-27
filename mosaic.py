@@ -21,14 +21,15 @@ crust_h = height % len
 crust_w = width % len
 # fixed: h->w
 count = 0
-print range(0, height, len)
-print range(0, width, len)
-
+print(range(0, height, len))
+print(range(0, width, len))
+'''
 for y in range(0, height, len):# 0, 80, 160, 240//0, 60, 120, 180, 240
     for x in range(0, width, len):# 0, 80, 160, 240, 320//0, 60, 120, 180, 240
         img[y:y + len, x:x + len, :].mean(0).mean(0)
         count += 1
 print count
+'''
 #
 #     if crust_w:
 #         print img[y:y + len, width - crust_w:width, :].mean(0).mean(0)
