@@ -14,6 +14,19 @@ import json
 '''
 "blackandwhite”, “transparent”, “red”, “orange”, “yellow”, “green”, “teal”, “blue”, “purple”, “pink”, “white”, “gray”, “black”, “brown”
 -> save at different directories? i dont think so
+# https://www.w3schools.com/colors/colors_groups.asp
+red = (255, 0, 0)
+orange = (255, 165, 0)
+yellow = (255, 255, 0)
+green = (0, 255, 0)
+teal = (0, 128, 128)
+blue = (0, 0, 255)
+purple = (128, 0, 128)
+pink = (255, 192, 203)
+white = (255, 255, 255)
+gray = (128, 128, 128)
+black = (0, 0, 0)
+brown = (165, 42, 42)
 
 '''
 
@@ -21,7 +34,7 @@ import json
 size = (400, 400)
 
 
-def tile_image_process():
+def tile_image_process2():
     tile_img_data = {}
     for root, dirs, files in os.walk('TileImages', topdown=False):
         for file in files:
@@ -48,7 +61,41 @@ def tile_image_process():
     with open('tile_data.txt', 'w') as out_file:  # save the data
         json.dump(tile_img_data, out_file)
 
+
+def tile_image_process():
+    tile_img_data = {}
+    for root, dirs, files in os.walk('TileImages', topdown=True):
+        for _dir in dirs:
+            tile_img_data[_dir] = {}
+        for file in files:
+            d = os.path.split(root)[-1]
+            name, ext = os.path.splitext(file)
+            im = Image.open(os.path.join(root, file))
+            im = im.resize(size)
+            if im.mode is not 'RGB':
+                im = im.convert('RGB')
+            os.remove(os.path.join(root, file))
+            im.save(os.path.join(root, name) + '.jpg', 'JPEG')  # resize and save the tile
+            img = numpy.asarray(im)
+            tile_img_data[d][name] = (img[:, :, :].mean(0).mean(0)).tolist()  # calculate average color
+    dir_data = {}
+    for k, v in tile_img_data.items():
+        with open('TileImages/{}/tile_data.txt'.format(k), 'w') as out_file:  # save the data
+            json.dump(v, out_file)
+        dir_rgb = []
+        for color in v.values():
+            dir_rgb.append(color)
+        #print(dir_rgb)
+        dir_color = numpy.asarray(dir_rgb)
+        dir_mean = numpy.mean(dir_color, axis=0)
+        #print(dir_mean)
+        dir_data[k] = dir_mean.tolist()
+    with open('directory_data.txt', 'w') as out_file:  # save the data
+        json.dump(dir_data, out_file)
+
+
 tile_image_process()
+
 '''
 from PIL import Image
 import glob, os

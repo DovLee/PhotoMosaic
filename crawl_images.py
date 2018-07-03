@@ -1,6 +1,7 @@
 from icrawler.builtin import GoogleImageCrawler
-from icrawler import Downloader, ImageDownloader
+from icrawler import ImageDownloader
 from six.moves.urllib.parse import urlparse
+import os
 
 # http://icrawler.readthedocs.io/en/latest/builtin.html#search-engine-crawlers
 # http://icrawler.readthedocs.io/en/latest/extend.html
@@ -35,13 +36,8 @@ class MyGoogleDownloader(ImageDownloader):  # override - saved gif as jpg and ch
         return '{}.{}'.format(file_idx, extension)
 
 
-google_crawler = GoogleImageCrawler(
-    downloader_cls=MyGoogleDownloader,
-    feeder_threads=1,
-    parser_threads=1,
-    downloader_threads=4,
-    storage={'root_dir': 'TileImages'},
-)
+ROOT = 'TileImages'
+
 filters = dict(
     size="medium",
     license='noncommercial'
@@ -49,7 +45,8 @@ filters = dict(
 colors = [
     'red', 'orange', 'yellow', 'green',
     'teal', 'blue', 'purple', 'pink',
-    'white', 'gray', 'black', 'brown']
+    'white', 'gray', 'black', 'brown'
+]
 keywords = [
     'flower', 'food', 'painting',
     'cat', 'landscape', 'forest',
@@ -57,8 +54,15 @@ keywords = [
 ]
 num = 100  # total:10800 imgs
 # total 10,800 images
-for k_idx in range(len(keywords)):
-    for c_idx in range(len(colors)):
-        filters['color'] = colors[c_idx]
+for c_idx in range(len(colors)):
+    google_crawler = GoogleImageCrawler(
+        downloader_cls=MyGoogleDownloader,
+        feeder_threads=1,
+        parser_threads=1,
+        downloader_threads=4,
+        storage={'root_dir': os.path.join(ROOT, colors[c_idx])},
+    )
+    filters['color'] = colors[c_idx]
+    for k_idx in range(len(keywords)):
         google_crawler.crawl(keyword=keywords[k_idx], filters=filters, offset=0, max_num=num,
-                             min_size=(400, 400), max_size=None, file_idx_offset=c_idx*num+k_idx*len(colors)*num)
+                             min_size=(400, 400), max_size=None, file_idx_offset=k_idx*num)
