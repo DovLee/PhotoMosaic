@@ -1,4 +1,6 @@
 TileImages
 target_data.txt
 tile_data.txt
-life_and_death.jpg
+*.png
+directory_data.txt
+.idea/workspace.xml

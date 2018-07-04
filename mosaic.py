@@ -51,8 +51,11 @@ json.dump(x, f)
 '''
 CELL_LENGTH = 10
 root = 'TileImages/'
-input_image = 'sample.jpg'
+#input_image = 'sample.jpg'
 #input_image = 'life_and_death.jpg'
+#input_image = 'lion.jpg'
+#input_image = 'game-of-thrones-4000x2231.jpg'
+input_image = 'Large_Scaled_Forest_Lizard.jpg'
 LEN_KEYWORDS = 9
 TILE_MAX_NUM = 100
 DIR_MAX_NUM = TILE_MAX_NUM * LEN_KEYWORDS
