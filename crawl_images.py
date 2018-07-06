@@ -2,7 +2,7 @@ from icrawler.builtin import GoogleImageCrawler
 from icrawler import ImageDownloader
 from six.moves.urllib.parse import urlparse
 import os
-
+import time
 # http://icrawler.readthedocs.io/en/latest/builtin.html#search-engine-crawlers
 # http://icrawler.readthedocs.io/en/latest/extend.html
 # https://programtalk.com/vs2/python/5261/icrawler/icrawler/examples/google.py/
@@ -54,6 +54,7 @@ keywords = [
 ]
 num = 100  # total:10800 imgs
 # total 10,800 images
+start_time = time.time()
 for c_idx in range(len(colors)):
     google_crawler = GoogleImageCrawler(
         downloader_cls=MyGoogleDownloader,
@@ -66,3 +67,6 @@ for c_idx in range(len(colors)):
     for k_idx in range(len(keywords)):
         google_crawler.crawl(keyword=keywords[k_idx], filters=filters, offset=0, max_num=num,
                              min_size=(400, 400), max_size=None, file_idx_offset=k_idx*num)
+
+elapsed_time = time.time() - start_time
+print(elapsed_time)

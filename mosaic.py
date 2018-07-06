@@ -3,6 +3,9 @@ import json
 import math
 from PIL import Image
 import color_transfer
+import time
+import os
+import numpy
 
 # http://www.compuphase.com/cmetric.htm
 # http://python-colormath.readthedocs.io/en/latest/
@@ -49,16 +52,19 @@ Between serializing and deserializing, the string representing the object may ha
 or sent over a network connection to some distant machine.
 json.dump(x, f)
 '''
-CELL_LENGTH = 10
-root = 'TileImages/'
+CELL_LENGTH = 20
+ROOT = 'TileImages'
 #input_image = 'sample.jpg'
-#input_image = 'life_and_death.jpg'
+input_image = 'life_and_death.jpg'
 #input_image = 'lion.jpg'
 #input_image = 'game-of-thrones-4000x2231.jpg'
-input_image = 'Large_Scaled_Forest_Lizard.jpg'
+#input_image = 'Large_Scaled_Forest_Lizard.jpg'
 LEN_KEYWORDS = 9
 TILE_MAX_NUM = 100
-DIR_MAX_NUM = TILE_MAX_NUM * LEN_KEYWORDS
+# DIR_MAX_NUM = TILE_MAX_NUM * LEN_KEYWORDS
+DIR_MAX_NUM = 100
+INTERVAL = 64
+d_list = list(range(0, 257, INTERVAL))
 
 
 def photo_process(file_name):
@@ -76,13 +82,15 @@ def photo_process(file_name):
         for x in range(0, width, cell_len):
             cell_data = {
                 'length': cell_len,
-                'averageColor': (img[y:y + cell_len, x:x + cell_len, :].mean(0).mean(0)).tolist()
+                'averageColor': [round(e) for e in (img[y:y + cell_len, x:x + cell_len, :].mean(0).mean(0)).tolist()]
             }
             img_data[y][x] = cell_data
-
+    return img_data
+'''
     # save image data as a file
     with open('target_data.txt', 'w') as out_file:
         json.dump(img_data, out_file)
+'''
 
 
 '''
@@ -298,12 +306,9 @@ def do_mosaic_choose_2_dir_less_repetition():  # seems less repetition code is n
     input_img.save(input_image.split('.')[0] + '_output_2_dir_less_rep_4.jpg', 'JPEG')
 
 
-def do_mosaic_choose_2_dir_less_repetition_with_toning():  # seems less repetition code is not working..
-    with open('target_data.txt', 'r') as target_file:
-        img_data = json.load(target_file)
+def do_mosaic_choose_2_dir_less_repetition_with_toning(img_data):  # seems less repetition code is not working..
     with open('directory_data.txt', 'r') as dir_file:
         dir_data = json.load(dir_file)
-
     input_img = Image.open(input_image)
     is_used = {}
     for d in dir_data:
@@ -429,14 +434,184 @@ def toning():
     misc.imsave('Test/new.jpg', new_image)
 
 
-photo_process(input_image)
-#do_mosaic_choose_1_dir()
-#do_mosaic_choose_2_dir()
-#do_mosaic_choose_1_dir_less_repetition()  # for the lower resolution - selecting 2 dir outputs better result
-#do_mosaic_choose_2_dir_less_repetition()  # for the higher resolution - selecting 1 dir outputs better result
-do_mosaic_choose_2_dir_less_repetition_with_toning()
-#toning()
+# prob 1 directory
+def mosaic2(img_data):
+    input_img = Image.open(input_image)
+    is_used = {}
+    dirs_name = []
+    file_cnt = {}
+    for root, dirs, files in os.walk('TileImages', topdown=True):
+        for d in dirs:
+            file_cnt[d] = len([name for name in os.listdir('.jpg') if os.path.isfile(name)])
+            is_used[d] = [False] * file_cnt[d]
+    for col, rows in img_data.items():
+        for row, values in rows.items():
+            closest_dir = []
+            for c in values['averageColor']:
+                for i in range(len(d_list)-1):
+                    if c in range(d_list[i], d_list[i+1]):
+                        closest_dir.append(d_list[i+1])
+            dir_name = '{}.{}.{}'.format(closest_dir[0], closest_dir[1], closest_dir[2])
+            tile_length = values['length']
+            tile_num = 0
+            m_diff = 800.0
+            min_dir = ''
+            min_idx = ''
+            min_diff = 800.0
+            with open('{}{}/tile_data.txt'.format(ROOT, dir_name), 'r') as tile_file:
+                    tile_data = json.load(tile_file)
+            for idx in tile_data:
+                diff = color_difference(values['averageColor'], tile_data[idx])
+                if diff < min_diff:
+                    flag = is_used[d][int(idx)]
+                    if flag is True:
+                        min_idx = idx
+                        m_diff = diff
+                        continue
+                    dir_name = d
+                    tile_num = idx
+                    min_diff = diff
+        if min_diff > 40 and m_diff < min_diff:
+            src = misc.imread(ROOT + min_dir + '/' + str(min_idx) + '.jpg')
+            dst = misc.imread(ROOT + dir_name + '/' + str(tile_num) + '.jpg')
+            new = color_transfer.color_transfer(src, dst)
+            tile = Image.fromarray(new)
+            tile = tile.resize((tile_length, tile_length))
+            input_img.paste(tile, (int(row), int(col)))
+            is_used[min_dir] = [False] * DIR_MAX_NUM
+            continue
+        tile = Image.open(ROOT + dir_name + '/' + str(tile_num) + '.jpg')
+        tile = tile.resize((tile_length, tile_length))
+        input_img.paste(tile, (int(row), int(col)))
+        is_used[dir_name][int(tile_num)] = True
+    input_img.save(input_image.split('.')[0] + '_mosaic.jpg', 'JPEG')
 
+
+def mosaic3(img_data):  # seems less repetition code is not working..
+    with open('directory_data.txt', 'r') as dir_file:
+        dir_data = json.load(dir_file)
+    input_img = Image.open(input_image)
+    is_used = {}
+    for d in dir_data:
+        is_used[d] = [False] * (DIR_MAX_NUM + 1)
+    for col, rows in img_data.items():
+        for row, values in rows.items():
+            dir_distance = {}
+            for d in dir_data:
+                dir_distance[d] = color_difference(values['averageColor'], dir_data[d])
+            sorted_by_value = sorted(dir_distance.items(), key=lambda kv: kv[1])
+            nearest_dir = [sorted_by_value[0][0], sorted_by_value[1][0]]
+            tile_length = values['length']
+            dir_name = ''
+            tile_num = 0
+            m_diff = 800.0
+            min_dir = ''
+            min_idx = ''
+            min_diff = 800.0
+            for d in nearest_dir:
+                with open(os.path.join(ROOT, d, 'tile_data.txt'), 'r') as tile_file:
+                    tile_data = json.load(tile_file)
+                for idx in tile_data:
+                    diff = color_difference(values['averageColor'], tile_data[idx])
+                    if diff < min_diff:
+                        flag = is_used[d][int(idx)]
+                        if flag is True:
+                            min_dir = d
+                            min_idx = idx
+                            m_diff = diff
+                            continue
+                        dir_name = d
+                        tile_num = idx
+                        min_diff = diff
+            if min_diff > 40 and m_diff < min_diff:
+                src = misc.imread(os.path.join(ROOT, min_dir, str(min_idx) + '.jpg'))
+                dst = misc.imread(os.path.join(ROOT, dir_name, str(tile_num) + '.jpg'))
+                new = color_transfer.color_transfer(src, dst)
+                tile = Image.fromarray(new)
+                tile = tile.resize((tile_length, tile_length))
+                input_img.paste(tile, (int(row), int(col)))
+                is_used[min_dir] = [False] * (DIR_MAX_NUM + 1)
+                continue
+            tile = Image.open(os.path.join(ROOT, dir_name, str(tile_num) + '.jpg'))
+            tile = tile.resize((tile_length, tile_length))
+            input_img.paste(tile, (int(row), int(col)))
+            is_used[dir_name][int(tile_num)] = True
+    input_img.save(input_image.split('.')[0] +'_mosaic_{}px.jpg'.format(str(tile_length)), 'JPEG')
+
+
+def mosaic(img_data):  # seems less repetition code is not working..
+    with open('directory_data.txt', 'r') as dir_file:
+        dir_data = json.load(dir_file)
+    input_img = Image.open(input_image)
+    is_used = {}
+    for d in dir_data:
+        is_used[d] = [False] * (DIR_MAX_NUM + 1)
+    with open('tile_data.txt', 'r') as tile_file:
+        tile_data = json.load(tile_file)
+    for col, rows in img_data.items():
+        for row, values in rows.items():
+            dir_distance = {}
+            for d in dir_data:
+                dir_distance[d] = color_difference(values['averageColor'], dir_data[d])
+            sorted_by_value = sorted(dir_distance.items(), key=lambda kv: kv[1])
+            nearest_dir = [sorted_by_value[0][0], sorted_by_value[1][0]]
+            tile_length = values['length']
+            dir_name = ''
+            tile_num = 0
+            m_diff = 800.0
+            min_dir = ''
+            min_idx = ''
+            min_diff = 800.0
+            for d in nearest_dir:
+                for idx in tile_data[d]:
+                    diff = color_difference(values['averageColor'], tile_data[d][idx])
+                    if diff < min_diff:
+                        flag = is_used[d][int(idx)]
+                        if flag is True:
+                            min_dir = d
+                            min_idx = idx
+                            m_diff = diff
+                            continue
+                        dir_name = d
+                        tile_num = idx
+                        min_diff = diff
+            if min_diff > 40 and m_diff < min_diff:
+                src = misc.imread(os.path.join(ROOT, min_dir, str(min_idx) + '.jpg'))
+                #src = numpy.asarray(Image.new('RGB', (tile_length, tile_length), tuple(values['averageColor'])))
+                dst = misc.imread(os.path.join(ROOT, dir_name, str(tile_num) + '.jpg'))
+                new = color_transfer.color_transfer(src, dst)
+                tile = Image.fromarray(new)
+                tile = tile.resize((tile_length, tile_length))
+                input_img.paste(tile, (int(row), int(col)))
+                is_used[min_dir] = [False] * (DIR_MAX_NUM + 1)
+                continue
+            tile = Image.open(os.path.join(ROOT, dir_name, str(tile_num) + '.jpg'))
+            tile = tile.resize((tile_length, tile_length))
+            input_img.paste(tile, (int(row), int(col)))
+            is_used[dir_name][int(tile_num)] = True
+    input_img.save(input_image.split('.')[0] + '_mosaic_{}px.jpg'.format(str(tile_length)), 'JPEG')
+
+    
+start_time = time.time()
+target_data = photo_process(input_image)
+elapsed_time = time.time() - start_time
+print(elapsed_time)
+mosaic(target_data)
+elapsed_time = time.time() - start_time
+print(elapsed_time)
+
+# src = numpy.asarray(Image.new('RGB', (400, 300), (55, 255, 255)))
+# misc.imsave('fortesting1.jpg', src)
+# dst = misc.imread('sample.jpg')
+# new = color_transfer.color_transfer(src, dst)
+# misc.imsave('fortesting2.jpg', new)
+
+
+
+# for root, dirs, files in os.walk('TileImages', topdown=True):
+#     for d in dirs:
+#         cnt = len([name for name in os.listdir(os.path.join(ROOT, d)) if os.path.isfile(os.path.join(ROOT, d, name))])
+#         print('Directory {}: {} jpg files'.format(d, cnt))
 '''
 tile = Image.open(root + '1' + '.jpg')
 tile = tile.resize((80, 80))
